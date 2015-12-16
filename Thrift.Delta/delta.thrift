@@ -1,25 +1,37 @@
+namespace csharp Configit.Thrift.Delta.Messages
 
-union Value {
-  // We could just put in a binary blob
-  // since we always knows what the type is.
-  // but does thrift allow serializing
-  // atomic type alone?
-  1: bool Bool,
-  2: byte Byte,
-  3: i16 Int16,
-  4: i32 Int32,
-  5: i64 Int64
-  6: double Double,
-  7: binary Binary,
-  8: string String
-  9: binary Object // Thrift struct/union
+// Filling in a new array has to be done per element
+
+union Content {
+  1: Special Special
+  2: bool Bool,
+  3: byte Byte,
+  4: i16 Int16,
+  5: i32 Int32,
+  6: i64 Int64
+  7: double Double,
+  8: binary Binary,
+  9: string String,
+  10: binary Object, // Serialized struct/union object
+  11: KeyValue KeyValue, // index into array or map
+  12: list<PathUpdate> Branches, // branches out from current path
 }
 
-// TODO: Distinguish between empty collection and null?
+enum Special{
+  Undefined = 0, // clear value
+  Empty = 1 // Allows emptying a collection
+}
 
-struct Change{
-  // Used for setting a property/indexing into a DFS node
-  1: optional Value Key,
+struct PathUpdate {
+  1: required list<i16> Path, // Index of field in message ( zero based )
+
+   // What to do at the path endpoint
+  2: required Content Content
+}
+
+struct KeyValue{
+  // Provides a key for collections (i32 for list, key-type for map)
+  1: optional Content Key,
 
   // Provides the value to set.
   // If not supplied, the value will set
@@ -27,17 +39,7 @@ struct Change{
   // To delete a collection element,
   // simply do not specify a value for the Node.
   // in the NodeChanges object
-  2: optional Value Value
-}
-
-struct NodeChanges{
-  // DFS id of base structure
-  1: i32 Node,
-
-  // If not present indicates a deletion of the node
-  // If the node is a collection element, the elemnt
-  // is removed from the collection.
-  2: optional array<Change> Changes
+  2: optional Content Value
 }
 
 struct ChangeSet {
@@ -45,33 +47,5 @@ struct ChangeSet {
   // object, this is used to identify that object
   1: optional binary BaseIdentifier,
 
-  2: array<NodeChanges> Changes
+  2: required list<PathUpdate> Updates
 }
-
-// service ExampleService{
-//   Response Process (1: Request request, 2: ChangeSet changes )
-// }
-//
-// struct Example{
-//   1: string Id,
-//   2: optional Example Child,
-// }
-//
-// { // DFS 0
-//   Id : "Me", // DFS 1
-//   Child : { // DFS 2
-//     Id: "Someone else" // DFS 3
-//     // unspecified Child is DFS 4
-//   }
-// }
-//
-// // If we want to add a Child
-// we do
-// {
-//   Node: 4,
-//   New: 5 // some number > max DFS
-// }
-// {
-//   Node: 6, // 5 + DFS inside 5 of Id
-//   Content: { String: "Shrek "}
-// }
